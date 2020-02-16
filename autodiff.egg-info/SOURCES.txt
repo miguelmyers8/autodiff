@@ -1,0 +1,12 @@
+setup.py
+autodiff/__init__.py
+autodiff/tracer.py
+autodiff/utils.py
+autodiff.egg-info/PKG-INFO
+autodiff.egg-info/SOURCES.txt
+autodiff.egg-info/dependency_links.txt
+autodiff.egg-info/not-zip-safe
+autodiff.egg-info/requires.txt
+autodiff.egg-info/top_level.txt
+autodiff/numpy/__init__.py
+autodiff/numpy/numpy_wrapper.py

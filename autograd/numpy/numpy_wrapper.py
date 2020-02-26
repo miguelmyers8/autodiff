@@ -1,6 +1,6 @@
 import numpy as _np
 import types
-from autodiff.tracer import primitive
+from autograd.tracer import primitive
 
 def wrap_namespace(old, new):
     """
@@ -10,6 +10,7 @@ def wrap_namespace(old, new):
     for name, obj in old.items():
         if type(obj) in function_types:
             new[name] = primitive(obj)
+
 
 """
 allows any numerical libary to be wrapped and have excutions traced

@@ -14,7 +14,7 @@ requires = [
 ]
 
 setup(
-    name='autodiff',
+    name='autograd',
     version='0.01',
     author='Miguel Myers',
     packages=find_packages(exclude=("test")),

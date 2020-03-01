@@ -20,23 +20,23 @@ def subval(x, i, v):
     x_[i] = v
     return tuple(x_)
 
-def toposort(end_node):
+def toposort(end_conatiner):
     child_counts = {}
-    stack = [end_node]
+    stack = [end_conatiner]
     while stack:
-        node = stack.pop()
-        if node in child_counts:
-            child_counts[node] += 1
+        conatiner = stack.pop()
+        if conatiner in child_counts:
+            child_counts[conatiner] += 1
         else:
-            child_counts[node] = 1
-            stack.extend(node.parents)
+            child_counts[conatiner] = 1
+            stack.extend(conatiner.parents)
 
-    childless_nodes = [end_node]
-    while childless_nodes:
-        node = childless_nodes.pop()
-        yield node
-        for parent in node.parents:
+    childless_conatiners = [end_conatiner]
+    while childless_conatiners:
+        conatiner = childless_conatiners.pop()
+        yield conatiner
+        for parent in conatiner.parents:
             if child_counts[parent] == 1:
-                childless_nodes.append(parent)
+                childless_conatiners.append(parent)
             else:
                 child_counts[parent] -= 1

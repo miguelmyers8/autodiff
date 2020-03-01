@@ -1,9 +1,16 @@
 import sys
 import autograd.numpy as anp
 import numpy as _np
-from autograd.tracer import primitive, _node
+from autograd.tracer import primitive, _conatiner, Node
 
-class Node(_node):
+
+def ensure_Conatiner(val):
+    if isinstance(val, conatiner):
+        return val
+    else:
+        return Conatiner(val)
+
+class conatiner(_conatiner):
     __slots__ = []
     __array_priority__ = 100.0
 
@@ -48,10 +55,10 @@ class Node(_node):
 
 
 
-Node.register(_np.ndarray)
+conatiner.register(_np.ndarray)
 for type_ in [float, _np.float64, _np.float32, _np.float16,
               complex, _np.complex64, _np.complex128]:
-    Node.register(type_)
+    conatiner.register(type_)
 
 
 # These numpy.ndarray methods are just refs to an equivalent numpy function
@@ -63,8 +70,12 @@ diff_methods = ['clip', 'compress', 'cumprod', 'cumsum', 'diagonal',
                 'trace', 'transpose', 'var']
 
 for method_name in nondiff_methods + diff_methods:
-    setattr(Node, method_name, anp.__dict__[method_name])
+    setattr(conatiner, method_name, anp.__dict__[method_name])
 
 
 # Flatten has no function, only a method.
-setattr(Node, 'flatten', anp.__dict__['ravel'])
+setattr(conatiner, 'flatten', anp.__dict__['ravel'])
+
+def Conatiner(val,requires_grad=False):
+    node = Node.new_root()
+    return conatiner(val,requires_grad=requires_grad,_node=node)

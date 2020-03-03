@@ -1,8 +1,8 @@
 import sys
-import autograd.numpy as anp
+from . import numpy_wrapper as anp
 import numpy as _np
 from autograd.tracer import primitive, _conatiner, Node
-
+from autograd.core import backward as _backward
 
 def ensure_Conatiner(val):
     if isinstance(val, conatiner):
@@ -24,7 +24,7 @@ class conatiner(_conatiner):
     dtype = property(lambda self: self._value.dtype)
     T = property(lambda self: anp.transpose(self._value))
     def __len__(self): return len(self._value)
-    def astype(self, *args, **kwargs): return anp._astype(self._value, *args, **kwargs)
+    def astype(self, *args, **kwargs): return anp._astype(self, *args, **kwargs)
 
     def __neg__(self): return anp.negative(self)
     def __add__(self, other): return anp.add(     self, other)
@@ -52,7 +52,8 @@ class conatiner(_conatiner):
     def __abs__(self): return anp.abs(self)
     def __hash__(self): return id(self)
 
-
+    def backward(self):
+        _backward(self)
 
 
 conatiner.register(_np.ndarray)
@@ -77,5 +78,4 @@ for method_name in nondiff_methods + diff_methods:
 setattr(conatiner, 'flatten', anp.__dict__['ravel'])
 
 def Conatiner(val,requires_grad=False):
-    node = Node.new_root()
-    return conatiner(val,requires_grad=requires_grad,_node=node)
+    return conatiner(val,requires_grad=requires_grad,_node=Node.new_root())

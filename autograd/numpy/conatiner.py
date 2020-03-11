@@ -1,14 +1,19 @@
 import sys
 from . import numpy_wrapper as anp
 import numpy as _np
-from autograd.tracer import primitive, _conatiner, Node
+from autograd.tracer import primitive, _conatiner
 from autograd.core import backward as _backward
+from autograd.core import VJPNode
 
 def ensure_Conatiner(val):
     if isinstance(val, conatiner):
         return val
     else:
         return Conatiner(val)
+
+def set_val(self,val):
+    self._value = val
+    return self
 
 class conatiner(_conatiner):
     __slots__ = []
@@ -24,7 +29,7 @@ class conatiner(_conatiner):
     dtype = property(lambda self: self._value.dtype)
     T = property(lambda self: anp.transpose(self._value))
     def __len__(self): return len(self._value)
-    def astype(self, *args, **kwargs): return anp._astype(self, *args, **kwargs)
+    def astype(self, *args, **kwargs): return set_val(self,anp._astype(self._value, *args, **kwargs))
 
     def __neg__(self): return anp.negative(self)
     def __add__(self, other): return anp.add(     self, other)
@@ -78,4 +83,4 @@ for method_name in nondiff_methods + diff_methods:
 setattr(conatiner, 'flatten', anp.__dict__['ravel'])
 
 def Conatiner(val,requires_grad=False):
-    return conatiner(val,requires_grad=requires_grad,_node=Node.new_root())
+    return conatiner(val,requires_grad=requires_grad,_node=VJPNode.new_root()).astype("float32")

@@ -1,4 +1,6 @@
 import numpy as np
+import operator
+import sys
 
 def wraps(fun, namestr="{fun}", docstr="{doc}", **kwargs):
     def _wraps(f):
@@ -20,23 +22,23 @@ def subval(x, i, v):
     x_[i] = v
     return tuple(x_)
 
-def toposort(end_conatiner):
+def toposort(end_node, parents=operator.attrgetter('parents')):
     child_counts = {}
-    stack = [end_conatiner]
+    stack = [end_node]
     while stack:
-        conatiner = stack.pop()
-        if conatiner in child_counts:
-            child_counts[conatiner] += 1
+        node = stack.pop()
+        if node in child_counts:
+            child_counts[node] += 1
         else:
-            child_counts[conatiner] = 1
-            stack.extend(conatiner.parents)
+            child_counts[node] = 1
+            stack.extend(parents(node))
 
-    childless_conatiners = [end_conatiner]
-    while childless_conatiners:
-        conatiner = childless_conatiners.pop()
-        yield conatiner
-        for parent in conatiner.parents:
+    childless_nodes = [end_node]
+    while childless_nodes:
+        node = childless_nodes.pop()
+        yield node
+        for parent in parents(node):
             if child_counts[parent] == 1:
-                childless_conatiners.append(parent)
+                childless_nodes.append(parent)
             else:
                 child_counts[parent] -= 1

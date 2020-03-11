@@ -1,8 +1,7 @@
 setup.py
 autograd/__init__.py
 autograd/core.py
-autograd/node.py
-autograd/setup.py
+autograd/extend.py
 autograd/tracer.py
 autograd/util.py
 autograd.egg-info/PKG-INFO
@@ -12,4 +11,7 @@ autograd.egg-info/not-zip-safe
 autograd.egg-info/requires.txt
 autograd.egg-info/top_level.txt
 autograd/numpy/__init__.py
+autograd/numpy/conatiner.py
+autograd/numpy/numpy_vjps.py
+autograd/numpy/numpy_vspaces.py
 autograd/numpy/numpy_wrapper.py

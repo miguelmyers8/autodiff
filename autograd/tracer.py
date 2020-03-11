@@ -16,7 +16,7 @@ def primitive(f_raw):
             argvals = subvals(args, [(argnum_,conatiner._value) for argnum_ , conatiner in prev])
             argnums = tuple(requires_grad_count for requires_grad_count, _ in parents)
             ans = f_raw(*argvals, **kwargs)
-            node = Node(ans, f_wrapped, argvals, kwargs, argnums, [c[1] for c in parents ])
+            node = type(prev[0][1]._node)(ans, f_wrapped, argvals, kwargs, argnums, [c[1] for c in parents ])
             return new_conatiner(ans,node,requires_grad)
         else:
             return f_raw(*args, **kwargs)
@@ -25,34 +25,16 @@ def primitive(f_raw):
 
 class Node(object):
     def __init__(self, value, fun, args, kwargs, parent_argnums, parents):
-        self.parents = parents
-        self.recipe = (fun, value, args, kwargs, parent_argnums)
-        self.is_leaf = self._is_leaf
-        self.saved_grad = None
-
+        assert False
 
     def initialize_root(self):
-        self.parents = []
-        self.recipe = (lambda x: x, None,(), {}, [])
-        self.is_leaf = self._is_leaf
-        self.saved_grad = None
+        assert False
 
     @classmethod
     def new_root(cls, *args, **kwargs):
         root = cls.__new__(cls)
         root.initialize_root(*args, **kwargs)
         return root
-
-    @property
-    def _is_leaf(self):
-        if not self.parents:
-            self.is_leaf = True
-        else:
-            self.is_leaf = False
-        return self.is_leaf
-
-
-
 
 class _conatiner(object):
     type_mappings = {}

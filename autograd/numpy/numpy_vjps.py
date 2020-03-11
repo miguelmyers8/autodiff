@@ -3,83 +3,70 @@ import numpy as onp
 from . import numpy_wrapper as anp
 from .conatiner import Conatiner
 from autograd.tracer import primitive
-from autograd.core import defvjp
+from autograd.extend import defvjp
 
 
 
 # ----- Binary ufuncs -----
 
-defvjp(anp.add,         lambda g, ans, x, y : unbroadcast(x, g),
-                        lambda g, ans, x, y : unbroadcast(y, g))
-defvjp(anp.multiply,    lambda g, ans, x, y : unbroadcast(x, y * g),
-                        lambda g, ans, x, y : unbroadcast(y, x * g))
-defvjp(anp.subtract,    lambda g, ans, x, y : unbroadcast(x, g),
-                        lambda g, ans, x, y : unbroadcast(y, -g))
-defvjp(anp.divide,      lambda g, ans, x, y : unbroadcast(x,   g / y),
-                        lambda g, ans, x, y : unbroadcast(y, - g * x / y**2))
-defvjp(anp.true_divide, lambda g, ans, x, y : unbroadcast(x,   g / y),
-                        lambda g, ans, x, y : unbroadcast(y, - g * x / y**2))
+defvjp(anp.add,         lambda ans, x, y : unbroadcast_f(x, lambda g: g),
+                        lambda ans, x, y : unbroadcast_f(y, lambda g: g))
+defvjp(anp.multiply,    lambda ans, x, y : unbroadcast_f(x, lambda g: y * g),
+                        lambda ans, x, y : unbroadcast_f(y, lambda g: x * g))
+defvjp(anp.subtract,    lambda ans, x, y : unbroadcast_f(x, lambda g: g),
+                        lambda ans, x, y : unbroadcast_f(y, lambda g: -g))
+defvjp(anp.divide,      lambda ans, x, y : unbroadcast_f(x, lambda g:   g / y),
+                        lambda ans, x, y : unbroadcast_f(y, lambda g: - g * x / y**2))
+defvjp(anp.maximum,     lambda ans, x, y : unbroadcast_f(x, lambda g: g * balanced_eq(x, ans, y)),
+                        lambda ans, x, y : unbroadcast_f(y, lambda g: g * balanced_eq(y, ans, x)))
+defvjp(anp.minimum,     lambda ans, x, y : unbroadcast_f(x, lambda g: g * balanced_eq(x, ans, y)),
+                        lambda ans, x, y : unbroadcast_f(y, lambda g: g * balanced_eq(y, ans, x)))
+defvjp(anp.fmax,        lambda ans, x, y : unbroadcast_f(x, lambda g: g * balanced_eq(x, ans, y)),
+                        lambda ans, x, y : unbroadcast_f(y, lambda g: g * balanced_eq(y, ans, x)))
+defvjp(anp.fmin,        lambda ans, x, y : unbroadcast_f(x, lambda g: g * balanced_eq(x, ans, y)),
+                        lambda ans, x, y : unbroadcast_f(y, lambda g: g * balanced_eq(y, ans, x)))
+defvjp(anp.logaddexp,   lambda ans, x, y : unbroadcast_f(x, lambda g: g * anp.exp(x-ans)),
+                        lambda ans, x, y : unbroadcast_f(y, lambda g: g * anp.exp(y-ans)))
+defvjp(anp.logaddexp2,  lambda ans, x, y : unbroadcast_f(x, lambda g: g * 2**(x-ans)),
+                        lambda ans, x, y : unbroadcast_f(y, lambda g: g * 2**(y-ans)))
+defvjp(anp.true_divide, lambda ans, x, y : unbroadcast_f(x, lambda g: g / y),
+                        lambda ans, x, y : unbroadcast_f(y, lambda g: - g * x / y**2))
+defvjp(anp.mod,         lambda ans, x, y : unbroadcast_f(x, lambda g: g),
+                        lambda ans, x, y : unbroadcast_f(y, lambda g: -g * anp.floor(x/y)))
+defvjp(anp.remainder,   lambda ans, x, y : unbroadcast_f(x, lambda g: g),
+                        lambda ans, x, y : unbroadcast_f(y, lambda g: -g * anp.floor(x/y)))
 defvjp(anp.power,
-    lambda g, ans, x, y: unbroadcast(x, g * y * x ** anp.where(y, y - 1, 1.)),
-    lambda g, ans, x, y: unbroadcast(y, g * anp.log(replace_zero(x, 1.)) * x ** y))
+    lambda ans, x, y : unbroadcast_f(x, lambda g: g * y * x ** anp.where(y, y - 1, 1.)),
+    lambda ans, x, y : unbroadcast_f(y, lambda g: g * anp.log(replace_zero(x, 1.)) * ans))
 
 def replace_zero(x, val):
     return anp.where(x, x, val)
 
-def unbroadcast(target, g, broadcast_idx=0):
-    while anp.ndim(g) > anp.ndim(target):
-        g = anp.sum(g, axis=broadcast_idx)
-    for axis, size in enumerate(anp.shape(target)):
+def unbroadcast(x, target_meta, broadcast_idx=0):
+    target_shape, target_ndim, dtype, target_iscomplex = target_meta
+    while anp.ndim(x) > target_ndim:
+        x = anp.sum(x, axis=broadcast_idx)
+    for axis, size in enumerate(target_shape):
         if size == 1:
-            g = anp.sum(g, axis=axis, keepdims=True)
-    if anp.iscomplexobj(g) and not anp.iscomplex(target):
-        g = anp.real(g)
-    return g
+            x = anp.sum(x, axis=axis, keepdims=True)
+    if anp.iscomplexobj(x) and not target_iscomplex:
+        x = anp.real(x)
+    return x
+
+
+def unbroadcast_f(target, f):
+    target_meta = anp.metadata(target)
+    return lambda g: unbroadcast(f(g), target_meta)
 
 # ----- Simple grads -----
 
-defvjp(anp.negative, lambda g, ans, x: -g)
-defvjp(anp.exp,    lambda g, ans, x: ans * g)
-defvjp(anp.log,    lambda g, ans, x: g / x)
-defvjp(anp.tanh,   lambda g, ans, x: g / anp.cosh(x) **2)
-defvjp(anp.sinh,   lambda g, ans, x: g * anp.cosh(x))
-defvjp(anp.cosh,   lambda g, ans, x: g * anp.sinh(x))
+defvjp(anp.negative, lambda ans, x: lambda g: -g)
+defvjp(anp.exp,    lambda ans, x : lambda g: ans * g)
+
+
 
 defvjp(anp.where, None,
-       lambda g, ans, c, x=None, y=None: anp.where(c, g, anp.zeros(g.shape)),
-       lambda g, ans, c, x=None, y=None: anp.where(c, anp.zeros(g.shape), g))
+       lambda ans, c, x=None, y=None : lambda g: anp.where(c, g, anp.zeros(g.shape)),
+       lambda ans, c, x=None, y=None : lambda g: anp.where(c, anp.zeros(g.shape), g))
 
-defvjp(anp.reshape, lambda g, ans, x, shape, order=None:
-       anp.reshape(g, anp.shape(x), order=order))
-
-# ----- Dot grads -----
-
-def _dot_vjp_0(g, ans, lhs, rhs):
-  if max(anp.ndim(lhs), anp.ndim(rhs)) > 2:
-    raise NotImplementedError("Current dot vjps only support ndim <= 2.")
-
-  if anp.ndim(lhs) == 0:
-    return anp.sum(rhs * g)
-  if anp.ndim(lhs) == 1 and anp.ndim(rhs) == 1:
-    return g * rhs
-  if anp.ndim(lhs) == 2 and anp.ndim(rhs) == 1:
-    return g[:, None] * rhs
-  if anp.ndim(lhs) == 1 and anp.ndim(rhs) == 2:
-    return anp.dot(rhs, g)
-  return anp.dot(g, rhs.T)
-
-def _dot_vjp_1(g, ans, lhs, rhs):
-  if max(anp.ndim(lhs), anp.ndim(rhs)) > 2:
-    raise NotImplementedError("Current dot vjps only support ndim <= 2.")
-
-  if anp.ndim(rhs) == 0:
-    return anp.sum(lhs * g)
-  if anp.ndim(lhs) == 1 and anp.ndim(rhs) == 1:
-    return g * lhs
-  if anp.ndim(lhs) == 2 and anp.ndim(rhs) == 1:
-    return anp.dot(g, lhs)
-  if anp.ndim(lhs) == 1 and anp.ndim(rhs) == 2:
-    return lhs[:, None] * g
-  return anp.dot(lhs.T, g)
-
-defvjp(anp.dot, _dot_vjp_0, _dot_vjp_1)
+defvjp(anp.reshape, lambda ans, x, shape, order=None : lambda g: anp.reshape(g, anp.shape(x), order=order))

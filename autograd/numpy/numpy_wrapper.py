@@ -1,6 +1,6 @@
 import numpy as _np
 import types
-from autograd.tracer import primitive
+from autograd.tracer import primitive, notrace_primitive
 
 def wrap_namespace(old, new):
 
@@ -14,7 +14,7 @@ def wrap_namespace(old, new):
 def _astype(A, dtype, order='K', casting='unsafe', subok=True, copy=True):
   return A.astype(dtype, order, casting, subok, copy)
 
-#@notrace_primitive
+@notrace_primitive
 def metadata(A):
     return _np.shape(A), _np.ndim(A), _np.result_type(A), _np.iscomplexobj(A)
 

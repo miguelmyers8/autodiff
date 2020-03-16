@@ -8,6 +8,7 @@ from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
 from setuptools import find_packages
+from Cython.Build import cythonize
 
 requires = [
     'six>=1.10.0'
@@ -17,6 +18,7 @@ setup(
     name='autograd',
     version='0.01',
     author='Miguel Myers',
+    #ext_modules = cythonize(["autograd/*.py","autograd/numpy/*.py"],language="c++"),
     packages=find_packages(exclude=("test")),
     install_requires=requires,
     author_email='miguelmyers8@gmail.com',

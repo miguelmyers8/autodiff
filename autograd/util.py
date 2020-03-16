@@ -42,3 +42,6 @@ def toposort(end_node, parents=operator.attrgetter('parents')):
                 childless_nodes.append(parent)
             else:
                 child_counts[parent] -= 1
+
+get_name = lambda f: getattr(f, '__name__', '[unknown name]')
+get_doc  = lambda f: getattr(f, '__doc__' , '')

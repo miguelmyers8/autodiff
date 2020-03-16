@@ -1,4 +1,5 @@
 from .util import subvals, wraps
+from collections import defaultdict
 
 def primitive(f_raw):
     def f_wrapped(*args, **kwargs):
@@ -20,6 +21,18 @@ def primitive(f_raw):
             return new_conatiner(ans,node,requires_grad)
         else:
             return f_raw(*args, **kwargs)
+    return f_wrapped
+
+notrace_primitives = defaultdict(set)
+def register_notrace(trace_type, primitive_fun):
+    notrace_primitives[trace_type].add(primitive_fun)
+
+def notrace_primitive(f_raw):
+    @wraps(f_raw)
+    def f_wrapped(*args, **kwargs):
+        argvals = map(getval, args)
+        return f_raw(*argvals, **kwargs)
+    f_wrapped._is_primitive = True
     return f_wrapped
 
 
@@ -75,4 +88,4 @@ def new_conatiner(value,requires_grad,_node):
 
 _conatiner_types = _conatiner.types
 is_conatiner  = lambda x: type(x) in _conatiner_types  # almost 3X faster than isinstance(x, conatiner)
-getval = lambda x: getval(x._value) if isconatiner(x) else x
+getval = lambda x: getval(x._value) if is_conatiner(x) else x

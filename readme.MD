@@ -20,7 +20,7 @@ import autograd.numpy as anp
 x = Conatiner(_np.linspace(-7,7,2),False)
 i = Conatiner(_np.linspace(-3,3,2),True)
 
-p = i*x+2
+p = 9+i*x+2
 p.backward()
 i.grad
 ```

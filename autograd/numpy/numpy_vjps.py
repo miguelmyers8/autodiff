@@ -58,6 +58,8 @@ def unbroadcast_f(target, f):
     target_meta = anp.metadata(target)
     return lambda g: unbroadcast(f(g), target_meta)
 
+def balanced_eq(x, z, y):
+    return (x == z) / (1.0 + (x == y))
 # ----- Simple grads -----
 
 defvjp(anp.negative, lambda ans, x: lambda g: -g)

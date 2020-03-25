@@ -1,15 +1,16 @@
-from collections import defaultdict
+from functools import reduce
 from autograd.util import toposort
 from itertools import count
 import numpy as np
-from .tracer import is_conatiner, getval, Node, primitive, _conatiner
+from .tracer import is_container, getval, Node, primitive, _container
+from .util import func, subval
 
-def backward(conatiner):
-    current_node = conatiner._node
-    assert conatiner.requires_grad, "called backward on non-requires-grad tensor"
-    #if current_conatiner.shape != ():
+def backward(container):
+    current_node = container._node
+    assert container.requires_grad, "called backward on non-requires-grad tensor"
+    #if current_container.shape != ():
         #raise RuntimeError("grad must be specified for non-0-tensor")
-    g = np.ones_like(conatiner._value)
+    g = np.ones_like(container._value)
     outgrads = {current_node : (g, False)}
     for node in toposort(current_node):
         outgrad = outgrads.pop(node)
@@ -49,37 +50,15 @@ class VJPNode(Node):
         return self.is_leaf
 
 
-def add_outgrads(prev_g_flagged, g):
-    sparse = type(g) in sparse_object_types
-    if prev_g_flagged:
-        vs = vspace(g)
-        prev_g, mutable = prev_g_flagged
-        if mutable:
-            if sparse:
-                return sparse_add(vs, prev_g, g), True
-            else:
-                return vs.mut_add(prev_g, g), True
-        else:
-            if sparse:
-                prev_g_mutable = vs.mut_add(None, prev_g)
-                return sparse_add(vs, prev_g_mutable, g), True
-            else:
-                return vs.add(prev_g, g), True
-    else:
-        if sparse:
-            return sparse_add(vspace(g), None, g), True
-        else:
-            return g, False
-
-@primitive
-def sparse_add(vs, x_prev, x_new):
-    x_prev = x_prev if x_prev is not None else vs.zeros()
-    return x_new.mut_add(x_prev)
-
 primitive_vjps = {}
 def defvjp_argnums(fun, vjpmaker):
     primitive_vjps[fun] = vjpmaker
 
+def defvjp_argnum(fun, vjpmaker):
+    def vjp_argnums(argnums, *args):
+        vjps = [vjpmaker(argnum, *args) for argnum in argnums]
+        return lambda g: (vjp(g) for vjp in vjps)
+    defvjp_argnums(fun, vjp_argnums)
 
 def defvjp(fun, *vjpmakers, **kwargs):
     argnums = kwargs.get('argnums', count())
@@ -125,6 +104,92 @@ def translate_vjp(vjpfun, fun, argnum):
     else:
         raise Exception("Bad VJP '{}' for '{}'".format(vjpfun, fun.__name__))
 
+
+# -------------------- forward mode --------------------
+
+class JVPNode(Node):
+    __slots__ = ['g']
+    def __init__(self, value, fun, args, kwargs, parent_argnums, parents):
+        parent_gs = [parent.g for parent in parents]
+        try:
+            jvpmaker = primitive_jvps[fun]
+        except KeyError:
+            name = getattr(fun, '__name__', fun)
+            raise NotImplementedError("JVP of {} wrt argnums {} not defined"
+                                      .format(name, parent_argnums))
+        self.g = jvpmaker(parent_argnums, parent_gs, value, args, kwargs)
+
+    def initialize_root(self, g):
+        self.g = g
+
+primitive_jvps = {}
+def defjvp_argnums(fun, jvpmaker):
+    primitive_jvps[fun] = jvpmaker
+
+def defjvp_argnum(fun, jvpmaker):
+    def jvp_argnums(argnums, gs, ans, args, kwargs):
+        return sum_outgrads(jvpmaker(argnum, g, ans, args, kwargs)
+                            for argnum, g in zip(argnums, gs))
+    defjvp_argnums(fun, jvp_argnums)
+
+def defjvp(fun, *jvpfuns, **kwargs):
+    argnums = kwargs.get('argnums', count())
+    jvps_dict = {argnum : translate_jvp(jvpfun, fun, argnum)
+                 for argnum, jvpfun in zip(argnums, jvpfuns)}
+    def jvp_argnums(argnums, gs, ans, args, kwargs):
+        return sum_outgrads(jvps_dict[argnum](g, ans, *args, **kwargs)
+                            for argnum, g in zip(argnums, gs))
+
+    defjvp_argnums(fun, jvp_argnums)
+
+def translate_jvp(jvpfun, fun, argnum):
+    if jvpfun is None:
+        return lambda g, ans, *a, **k: vspace(ans).zeros()
+    elif jvpfun == 'same':
+        return (lambda g, ans, *args, **kwargs:
+                fun(*subval(args, argnum, g), **kwargs))
+    elif callable(jvpfun):
+        return jvpfun
+    else:
+        raise Exception("Bad JVP '{}' for '{}'".format(jvpfun, fun.__name__))
+
+def def_linear(fun):
+    """Flags that a function is linear wrt all args"""
+    defjvp_argnum(fun, lambda argnum, g, ans, args, kwargs:
+                  fun(*subval(args, argnum, g), **kwargs))
+
+# -------------------- vector behavior --------------------
+
+def add_outgrads(prev_g_flagged, g):
+    sparse = type(g) in sparse_object_types
+    if prev_g_flagged:
+        vs = vspace(g)
+        prev_g, mutable = prev_g_flagged
+        if mutable:
+            if sparse:
+                return sparse_add(vs, prev_g, g), True
+            else:
+                return vs.mut_add(prev_g, g), True
+        else:
+            if sparse:
+                prev_g_mutable = vs.mut_add(None, prev_g)
+                return sparse_add(vs, prev_g_mutable, g), True
+            else:
+                return vs.add(prev_g, g), True
+    else:
+        if sparse:
+            return sparse_add(vspace(g), None, g), True
+        else:
+            return g, False
+
+
+def sum_outgrads(gs):
+    return reduce(add_outgrads, gs, None)[0]
+
+@primitive
+def sparse_add(vs, x_prev, x_new):
+    x_prev = x_prev if x_prev is not None else vs.zeros()
+    return x_new.mut_add(x_prev)
 
 class VSpace(object):
     __slots__ = []
@@ -175,7 +240,7 @@ def vspace(value):
     try:
         return VSpace.mappings[type(value)](value)
     except KeyError:
-        if is_conatiner(value):
+        if is_container(value):
             return vspace(getval(value))
         else:
             raise TypeError("Can't find vector space for value {} of type {}. "
@@ -183,7 +248,7 @@ def vspace(value):
                                 value, type(value), VSpace.mappings.keys()))
 
 
-class Sparse_conatiner(_conatiner):
+class Sparse_container(_container):
     __slots__ = []
 class SparseObject(object):
     __slots__ = ['vs', 'mut_add']
@@ -191,5 +256,86 @@ class SparseObject(object):
         self.vs = vs
         self.mut_add = mut_add
 VSpace.register(SparseObject, lambda x : x.vs)
-Sparse_conatiner.register(SparseObject)
-sparse_object_types = {SparseObject, Sparse_conatiner}
+Sparse_container.register(SparseObject)
+sparse_object_types = {SparseObject, Sparse_container}
+
+# -------------------- core reverse mode grads --------------------
+
+identity_vjp = lambda argnums, *args: lambda g: g
+defvjp(sparse_add, None, identity_vjp, identity_vjp)
+defvjp(func(VSpace.add    ), None, identity_vjp, identity_vjp)
+defvjp(func(VSpace.mut_add), None, identity_vjp, identity_vjp)
+defvjp(func(VSpace.inner_prod), None,
+       lambda ans, vs, x, y: lambda g:  vs.covector(vs.scalar_mul(y, g)),
+       lambda ans, vs, x, y: lambda g:  vs.covector(vs.scalar_mul(x, g)))
+defvjp(func(VSpace.covector), None,
+          lambda ans, vs, x: lambda g: vs.covector(g))
+defvjp(func(VSpace.scalar_mul), None,
+       lambda ans, vs, x, a: lambda g: vs.covector(vs.scalar_mul(vs.covector(g), a)),
+       lambda ans, vs, x, a: lambda g: vs.inner_prod(g, vs.covector(x)))
+
+# -------------------- core forward mode grads --------------------
+
+identity_jvp = lambda g, *args, **kwargs: g
+defjvp(sparse_add, None, identity_jvp, identity_jvp)
+defjvp(func(VSpace.mut_add), None, identity_jvp, identity_jvp)
+defjvp(func(VSpace.add),     None, identity_jvp, identity_jvp)
+defjvp(func(VSpace.scalar_mul), None, 'same', 'same')
+defjvp(func(VSpace.inner_prod), None, 'same', 'same')
+defjvp(func(VSpace.covector),   None, 'same')
+
+# -------------------- deprecation warnings -----------------------
+
+import warnings
+deprecated_defvjp_message = '''
+The {} method is deprecated. See the update guide and tutorial:
+https://github.com/HIPS/autograd/blob/master/docs/updateguide.md
+https://github.com/HIPS/autograd/blob/master/docs/tutorial.md'''
+
+def deprecated_defvjp(primitive_fun):
+    deprecation_msg = deprecated_defvjp_message.format('defvjp')
+    vjpfuns = {}
+    def defvjp_unstaged(vjpmaker, argnum=0):
+        warnings.warn(deprecation_msg)
+        def staged_vjpmaker(ans, *args, **kwargs):
+            def vjp(g):
+                vs, gvs = vspace(args[argnum]), vspace(g)
+                return vjpmaker(g, ans, vs, gvs, *args, **kwargs)
+            return vjp
+        vjpfuns[argnum] = staged_vjpmaker
+        argnums, vjpmakers = zip(*[(argnum, vjpfuns[argnum])
+                                   for argnum in sorted(vjpfuns.keys())])
+        defvjp(primitive_fun, *vjpmakers, argnums=argnums)
+    return defvjp_unstaged
+
+def deprecated_defvjp_is_zero(primitive_fun):
+    deprecation_msg = deprecated_defvjp_message.format('defvjp_is_zero')
+    zero_vjps = [set()]
+    def defvjp_is_zero(argnums=(0,)):
+        warnings.warn(deprecation_msg)
+        zero_vjps[0] |= set(argnums)
+        nones = [None] * len(zero_vjps[0])
+        defvjp(primitive_fun, *nones, argnums=sorted(zero_vjps[0]))
+    return defvjp_is_zero
+
+def deprecated_defgrad(primitive_fun):
+    deprecation_msg = deprecated_defvjp_message.format('defgrad')
+    gradfuns = {}
+    def defgrad(gradfun, argnum=0):
+        warnings.warn(deprecation_msg)
+        gradfuns[argnum] = gradfun
+        argnums, vjpmakers = zip(*[(argnum, gradfuns[argnum])
+                                   for argnum in sorted(gradfuns.keys())])
+        defvjp(primitive_fun, *vjpmakers, argnums=argnums)
+    return defgrad
+
+primitive_ = primitive
+
+def primitive_with_deprecation_warnings(f_raw):
+    f_wrapped = primitive_(f_raw)
+    f_wrapped.defvjp = deprecated_defvjp(f_wrapped)
+    f_wrapped.defvjp_is_zero = deprecated_defvjp_is_zero(f_wrapped)
+    f_wrapped.defgrad = deprecated_defgrad(f_wrapped)
+    return f_wrapped
+
+primitive = primitive_with_deprecation_warnings

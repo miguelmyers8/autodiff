@@ -13,14 +13,14 @@ This autograd will function like pytorch.
 
 ## Example:
 ```python
-from autograd.numpy.conatiner import Conatiner
+from autograd.numpy.container import Container
 import numpy as _np
 import autograd.numpy as anp
 
-x = Conatiner(_np.linspace(-7,7,2),False)
-i = Conatiner(_np.linspace(-3,3,2),True)
+x = Container(_np.linspace(-7,7,2),False)
+i = Container(_np.linspace(-3,3,2),True)
 
-p = 9+i*x+2
+p = 9+i*x+2/x
 p.backward()
 i.grad
 ```

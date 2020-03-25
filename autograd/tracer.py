@@ -7,18 +7,18 @@ def primitive(f_raw):
         prev = []
         req = []
         for argnum,arg in enumerate(args):
-            if is_conatiner(arg):
+            if is_container(arg):
                 prev.append((argnum,arg))
                 req.append(arg.requires_grad)
                 if arg.requires_grad:
                     parents.append((argnum, arg._node))
         if prev:
             requires_grad = True in req
-            argvals = subvals(args, [(argnum_,conatiner._value) for argnum_ , conatiner in prev])
+            argvals = subvals(args, [(argnum_,container._value) for argnum_ , container in prev])
             argnums = tuple(requires_grad_count for requires_grad_count, _ in parents)
             ans = f_raw(*argvals, **kwargs)
             node = type(prev[0][1]._node)(ans, f_wrapped, argvals, kwargs, argnums, [c[1] for c in parents ])
-            return new_conatiner(ans,node,requires_grad)
+            return new_container(ans,node,requires_grad)
         else:
             return f_raw(*args, **kwargs)
     return f_wrapped
@@ -49,7 +49,7 @@ class Node(object):
         root.initialize_root(*args, **kwargs)
         return root
 
-class _conatiner(object):
+class _container(object):
     type_mappings = {}
     types = set()
 
@@ -69,23 +69,23 @@ class _conatiner(object):
     __nonzero__ = __bool__
 
     def __repr__(self):
-        return "Conatiner({0}, requires_grad={1})".format( str(self._value), str(self.requires_grad))
+        return "Container({0}, requires_grad={1})".format( str(self._value), str(self.requires_grad))
 
     @classmethod
     def register(cls, value_type):
-        _conatiner.types.add(cls)
-        _conatiner.type_mappings[value_type] = cls
-        _conatiner.type_mappings[cls] = cls
+        _container.types.add(cls)
+        _container.type_mappings[value_type] = cls
+        _container.type_mappings[cls] = cls
 
 
 
-_conatiner_type_mappings = _conatiner.type_mappings
-def new_conatiner(value,requires_grad,_node):
+_container_type_mappings = _container.type_mappings
+def new_container(value,requires_grad,_node):
     try:
-        return  _conatiner_type_mappings[type(value)](value,requires_grad,_node) # map all type to conatiner type and call it
+        return  _container_type_mappings[type(value)](value,requires_grad,_node) # map all type to container type and call it
     except KeyError:
         raise TypeError("Can't differentiate w.r.t. type {}".format(type(value)))
 
-_conatiner_types = _conatiner.types
-is_conatiner  = lambda x: type(x) in _conatiner_types  # almost 3X faster than isinstance(x, conatiner)
-getval = lambda x: getval(x._value) if is_conatiner(x) else x
+_container_types = _container.types
+is_container  = lambda x: type(x) in _container_types  # almost 3X faster than isinstance(x, container)
+getval = lambda x: getval(x._value) if is_container(x) else x

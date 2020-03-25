@@ -1,9 +1,12 @@
 setup.py
 autograd/__init__.py
+autograd/builtins.py
 autograd/core.py
+autograd/differential_operators.py
 autograd/extend.py
 autograd/tracer.py
 autograd/util.py
+autograd/wrap_util.py
 autograd.egg-info/PKG-INFO
 autograd.egg-info/SOURCES.txt
 autograd.egg-info/dependency_links.txt
@@ -11,7 +14,10 @@ autograd.egg-info/not-zip-safe
 autograd.egg-info/requires.txt
 autograd.egg-info/top_level.txt
 autograd/numpy/__init__.py
-autograd/numpy/conatiner.py
+autograd/numpy/container.py
+autograd/numpy/fft.py
+autograd/numpy/linalg.py
+autograd/numpy/numpy_jvps.py
 autograd/numpy/numpy_vjps.py
 autograd/numpy/numpy_vspaces.py
 autograd/numpy/numpy_wrapper.py

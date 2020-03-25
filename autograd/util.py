@@ -22,6 +22,11 @@ def subval(x, i, v):
     x_[i] = v
     return tuple(x_)
 
+if sys.version_info >= (3,):
+    def func(f): return f
+else:
+    def func(f): return f.__func__    
+
 def toposort(end_node, parents=operator.attrgetter('parents')):
     child_counts = {}
     stack = [end_node]

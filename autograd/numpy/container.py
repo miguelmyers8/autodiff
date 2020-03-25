@@ -1,21 +1,21 @@
 import sys
 from . import numpy_wrapper as anp
 import numpy as _np
-from autograd.tracer import primitive, _conatiner
+from autograd.tracer import primitive, _container
 from autograd.core import backward as _backward
 from autograd.core import VJPNode
 
-def ensure_Conatiner(val):
-    if isinstance(val, conatiner):
+def ensure_Container(val):
+    if isinstance(val, container):
         return val
     else:
-        return Conatiner(val)
+        return Container(val)
 
 def set_val(self,val):
     self._value = val
     return self
 
-class conatiner(_conatiner):
+class container(_container):
     __slots__ = []
     __array_priority__ = 100.0
 
@@ -61,10 +61,10 @@ class conatiner(_conatiner):
         _backward(self)
 
 
-conatiner.register(_np.ndarray)
+container.register(_np.ndarray)
 for type_ in [float, _np.float64, _np.float32, _np.float16,
               complex, _np.complex64, _np.complex128]:
-    conatiner.register(type_)
+    container.register(type_)
 
 
 # These numpy.ndarray methods are just refs to an equivalent numpy function
@@ -76,11 +76,11 @@ diff_methods = ['clip', 'compress', 'cumprod', 'cumsum', 'diagonal',
                 'trace', 'transpose', 'var']
 
 for method_name in nondiff_methods + diff_methods:
-    setattr(conatiner, method_name, anp.__dict__[method_name])
+    setattr(container, method_name, anp.__dict__[method_name])
 
 
 # Flatten has no function, only a method.
-setattr(conatiner, 'flatten', anp.__dict__['ravel'])
+setattr(container, 'flatten', anp.__dict__['ravel'])
 
-def Conatiner(val,requires_grad=False):
-    return conatiner(val,requires_grad=requires_grad,_node=VJPNode.new_root()).astype("float32")
+def Container(val,requires_grad=False):
+    return container(val,requires_grad=requires_grad,_node=VJPNode.new_root()).astype("float32")

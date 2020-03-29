@@ -1,6 +1,27 @@
 from .util import subvals, wraps
 from collections import defaultdict
+import warnings
+# ================= Needs work ============
+#def trace(start_node, fun, x):
+    #with trace_stack.new_trace() as t:
+        #start_container = new_container(x, t, start_node)
+        #end_container = fun(start_container)
+        #if is_container(end_container) and end_container._trace == start_box._container:
+            #return end_container._value, end_container._node
+        #else:
+            #warnings.warn("Output seems independent of input.")
+            #return end_container, None
 
+#class TraceStack(object):
+    #def __init__(self):
+        #self.top = -1
+    #@contextmanager
+    #def new_trace(self):
+        #self.top += 1
+        #yield self.top
+        #self.top -= 1
+#trace_stack = TraceStack()
+# =========================================
 def primitive(f_raw):
     def f_wrapped(*args, **kwargs):
         parents = []

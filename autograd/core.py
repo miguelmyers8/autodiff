@@ -5,11 +5,23 @@ import numpy as np
 from .tracer import is_container, getval, Node, primitive, _container
 from .util import func, subval
 
+#======== NEEDS WORK ============
+#def make_vjp(fun, x):
+    #start_node = VJPNode.new_root()
+    #end_value, end_node =  trace(start_node, fun, x)
+    #if end_node is None:
+        #def vjp(g): return vspace(x).zeros()
+    #else:
+        #def vjp(g): return backward_pass(g, end_node)
+    #return vjp, end_value
+#==================================
+
+
 def backward(container):
     current_node = container._node
     assert container.requires_grad, "called backward on non-requires-grad tensor"
-    #if current_container.shape != ():
-        #raise RuntimeError("grad must be specified for non-0-tensor")
+    if container.shape != ():
+        raise RuntimeError("grad must be specified for non-0-tensor")
     g = np.ones_like(container._value)
     outgrads = {current_node : (g, False)}
     for node in toposort(current_node):

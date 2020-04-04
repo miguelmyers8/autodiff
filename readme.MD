@@ -13,9 +13,12 @@ This autograd will function like pytorch.
 
 ## Example:
 ```python
-from autograd.numpy.container import Container
+from autograd.numpy.container import container, VJPNode
 import numpy as _np
 import autograd.numpy as anp
+
+def Container(val,requires_grad=False):
+    return container(val,requires_grad=requires_grad,_node=VJPNode.new_root())
 
 x = Container(_np.linspace(-7,7,2),False)
 i = Container(_np.linspace(-3,3,2),True)

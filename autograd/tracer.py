@@ -39,7 +39,7 @@ def primitive(f_raw):
             argnums = tuple(requires_grad_count for requires_grad_count, _ in parents)
             ans = f_raw(*argvals, **kwargs)
             node = type(prev[0][1]._node)(ans, f_wrapped, argvals, kwargs, argnums, [c[1] for c in parents ])
-            return new_container(ans,node,requires_grad)
+            return new_container(ans,requires_grad,node)
         else:
             return f_raw(*args, **kwargs)
     return f_wrapped
@@ -74,15 +74,18 @@ class _container(object):
     type_mappings = {}
     types = set()
 
-    def __init__(self, value, _node,requires_grad=False):
-        self._value = value
-        self._node = _node
+    def __init__(self, value, requires_grad, _node):
+        self._value = value.astype("float32")
         self.requires_grad = requires_grad
+        self._node = _node
 
     @property
     def grad(self):
         if self._node.is_leaf:
             return self._node.saved_grad
+
+    def cleargrad(self):
+        self.grad = None
 
     def __bool__(self):
         return bool(self._value)

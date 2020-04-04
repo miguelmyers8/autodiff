@@ -81,6 +81,3 @@ for method_name in nondiff_methods + diff_methods:
 
 # Flatten has no function, only a method.
 setattr(container, 'flatten', anp.__dict__['ravel'])
-
-def Container(val,requires_grad=False):
-    return container(val,requires_grad=requires_grad,_node=VJPNode.new_root()).astype("float32")

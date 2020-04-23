@@ -1,6 +1,9 @@
 from .util import subvals, wraps
 from collections import defaultdict
 import warnings
+import numpy as _np
+import contextlib
+
 # ================= Needs work ============
 #def trace(start_node, fun, x):
     #with trace_stack.new_trace() as t:
@@ -22,6 +25,27 @@ import warnings
         #self.top -= 1
 #trace_stack = TraceStack()
 # =========================================
+
+class Config:
+    enable_backprop = True
+    train = True
+
+@contextlib.contextmanager
+def using_config(name, value):
+    old_value = getattr(Config, name)
+    setattr(Config, name, value)
+    try:
+        yield
+    finally:
+        setattr(Config, name, old_value)
+
+def no_grad():
+    return using_config('enable_backprop', False)
+
+def test_mode():
+    return using_config('train', False)
+
+
 def primitive(f_raw):
     def f_wrapped(*args, **kwargs):
         parents = []
@@ -38,8 +62,11 @@ def primitive(f_raw):
             argvals = subvals(args, [(argnum_,container._value) for argnum_ , container in prev])
             argnums = tuple(requires_grad_count for requires_grad_count, _ in parents)
             ans = f_raw(*argvals, **kwargs)
-            node = type(prev[0][1]._node)(ans, f_wrapped, argvals, kwargs, argnums, [c[1] for c in parents ])
-            return new_container(ans,requires_grad,node)
+            if Config.enable_backprop:
+                node = type(prev[0][1]._node)(ans, f_wrapped, argvals, kwargs, argnums, [c[1] for c in parents ])
+                return new_container(ans,requires_grad,node)
+            node = type(prev[0][1]._node).new_root()
+            return new_container(ans,False,node)
         else:
             return f_raw(*args, **kwargs)
     return f_wrapped
@@ -56,6 +83,11 @@ def notrace_primitive(f_raw):
     f_wrapped._is_primitive = True
     return f_wrapped
 
+def ensure_array_float32(arrayable) :
+    if isinstance(arrayable, (_container, _np.ndarray)):
+        return arrayable.astype("float32")
+    else:
+        return arrayable
 
 class Node(object):
     def __init__(self, value, fun, args, kwargs, parent_argnums, parents):
@@ -75,7 +107,7 @@ class _container(object):
     types = set()
 
     def __init__(self, value, requires_grad, _node):
-        self._value = value.astype("float32")
+        self._value = ensure_array_float32(value)
         self.requires_grad = requires_grad
         self._node = _node
 
@@ -84,8 +116,9 @@ class _container(object):
         if self._node.is_leaf:
             return self._node.saved_grad
 
-    def cleargrad(self):
-        self.grad = None
+    def zero_grad(self):
+        if self._node.is_leaf:
+            self._node.saved_grad = None
 
     def __bool__(self):
         return bool(self._value)

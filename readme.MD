@@ -24,6 +24,6 @@ x = Container(_np.linspace(-7,7,2),False)
 i = Container(_np.linspace(-3,3,2),True)
 
 p = 9+i*x+2/x
-p.backward()
+anp.sum(p).backward()
 i.grad
 ```

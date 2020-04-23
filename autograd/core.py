@@ -2,7 +2,7 @@ from functools import reduce
 from autograd.util import toposort
 from itertools import count
 import numpy as np
-from .tracer import is_container, getval, Node, primitive, _container
+from .tracer import is_container, getval, Node, primitive, _container, Config
 from .util import func, subval
 
 #======== NEEDS WORK ============
@@ -22,7 +22,7 @@ def backward(container):
     assert container.requires_grad, "called backward on non-requires-grad tensor"
     if container.shape != ():
         raise RuntimeError("grad must be specified for non-0-tensor")
-    g = np.ones_like(container._value)
+    g = np.ones_like(container._value, dtype=np.float32)
     outgrads = {current_node : (g, False)}
     for node in toposort(current_node):
         outgrad = outgrads.pop(node)
@@ -39,13 +39,14 @@ class VJPNode(Node):
         self.parents = parents
         self.is_leaf = self._is_leaf
         self.saved_grad = None
-        try:
-            vjpmaker = primitive_vjps[fun]
-        except KeyError:
-            fun_name = getattr(fun, '__name__', fun)
-            raise NotImplementedError("VJP of {} wrt argnums {} not defined"
-                                      .format(fun_name, parent_argnums))
-        self.vjp = vjpmaker(parent_argnums, value, args, kwargs)
+        if fun:
+            try:
+                vjpmaker = primitive_vjps[fun]
+            except KeyError:
+                fun_name = getattr(fun, '__name__', fun)
+                raise NotImplementedError("VJP of {} wrt argnums {} not defined"
+                                          .format(fun_name, parent_argnums))
+            self.vjp = vjpmaker(parent_argnums, value, args, kwargs)
 
     def initialize_root(self):
         self.parents = []
@@ -55,7 +56,7 @@ class VJPNode(Node):
 
     @property
     def _is_leaf(self):
-        if not self.parents:
+        if (Config.enable_backprop) and (not self.parents):
             self.is_leaf = True
         else:
             self.is_leaf = False

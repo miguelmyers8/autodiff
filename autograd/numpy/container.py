@@ -5,11 +5,6 @@ from autograd.tracer import primitive, _container
 from autograd.core import backward as _backward
 from autograd.core import VJPNode
 
-def ensure_Container(val):
-    if isinstance(val, container):
-        return val
-    else:
-        return Container(val)
 
 def set_val(self,val):
     self._value = val
@@ -56,7 +51,18 @@ class container(_container):
     def __le__(self, other): return anp.less_equal(self, other)
     def __abs__(self): return anp.abs(self)
     def __hash__(self): return id(self)
+    #===================== CODE SMELL =======================
+    def __iadd__(self,other):
+        # self += other
+        c = anp.add(self , other)
+        self._value, self._node = c._value,c._node
+        return self
 
+    def __isub__(self,other):
+        c = anp.sub(self , other)
+        self._value, self._node = c._value,c._node
+        return self
+    #========================================================
     def backward(self):
         _backward(self)
 

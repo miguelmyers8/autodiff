@@ -47,6 +47,7 @@ def test_mode():
 
 
 def primitive(f_raw):
+    @wraps(f_raw)
     def f_wrapped(*args, **kwargs):
         parents = []
         prev = []
@@ -61,7 +62,7 @@ def primitive(f_raw):
             requires_grad = True in req
             argvals = subvals(args, [(argnum_,container._value) for argnum_ , container in prev])
             argnums = tuple(requires_grad_count for requires_grad_count, _ in parents)
-            ans = f_raw(*argvals, **kwargs)
+            ans = f_wrapped(*argvals, **kwargs)
             if Config.enable_backprop:
                 node = type(prev[0][1]._node)(ans, f_wrapped, argvals, kwargs, argnums, [c[1] for c in parents ])
                 return new_container(ans,requires_grad,node)
@@ -69,6 +70,8 @@ def primitive(f_raw):
             return new_container(ans,False,node)
         else:
             return f_raw(*args, **kwargs)
+    f_wrapped.fun = f_raw
+    f_wrapped._is_autograd_primitive = True
     return f_wrapped
 
 notrace_primitives = defaultdict(set)

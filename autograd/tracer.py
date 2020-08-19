@@ -117,7 +117,12 @@ class _container(object):
     @property
     def grad(self):
         if self._node.is_leaf:
-            return self._node.saved_grad
+            return self._node.saved_grad.reshape(*self._value.shape)
+
+    @grad.setter
+    def grad(self, x):
+        if self._node.is_leaf:
+            self._node.saved_grad = x
 
     def zero_grad(self):
         if self._node.is_leaf:

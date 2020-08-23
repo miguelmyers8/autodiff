@@ -22,7 +22,7 @@ def backward(container):
     assert container.requires_grad, "called backward on non-requires-grad tensor"
     if container.shape != ():
         raise RuntimeError("grad must be specified for non-0-tensor")
-    g = np.ones_like(container._value, dtype=np.float32)
+    g = vspace(container._value).ones()
     outgrads = {current_node : (g, False)}
     for node in toposort(current_node):
         outgrad = outgrads.pop(node)
